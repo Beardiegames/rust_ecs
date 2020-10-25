@@ -1,2 +1,2 @@
 # rust_ecs
-Simple and fast ECS tool for Rust
+Simple and fast ECS library for Rust
