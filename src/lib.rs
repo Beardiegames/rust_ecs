@@ -1,11 +1,11 @@
 
-mod entity;
+pub mod entity;
 use entity::{ Entity, Entities };
 
-mod component;
+pub mod component;
 use component::Component;
 
-mod system;
+pub mod system;
 use system::System;
 
 
