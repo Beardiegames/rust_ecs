@@ -1,5 +1,5 @@
 [package]
-name = "ecs"
+name = "simple-ecs"
 version = "0.1.0"
 authors = ["Thomas van den Bighelaar <thomas@beardiegames.com>"]
 edition = "2018"

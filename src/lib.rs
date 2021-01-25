@@ -1,104 +1,158 @@
 
-pub mod entity;
-use entity::{ Entity, Entities };
+mod pool;
+mod systems;
+mod types;
+mod tests;
 
-pub mod component;
-use component::Component;
+use std::fmt::Debug;
+use pool::{ Objects, Entities };
+use systems::{ System, Behaviour };
+use types::{ NameTag, ComponentRefs, ComponentRef, BitFlags };
 
-pub mod system;
-use system::System;
 
+const MAX_OBJECTS: usize = 1000;
 
-pub struct ECS {
-    entity_stack_size: usize,
-    entities: Entities,
+type ObjectIndex = usize;
+type ComponentIndex = usize;
+type SystemIndex = usize;
+
+pub struct Ecs<T: Default> { 
+    objects: Objects<T>, // object data pool, in other words entity component data
+    entities: Entities, // object component implementation flags
+    systems: Vec<System>, // behaviour wrappers for executing custom behaviour scripts
+    behaviours: Vec<Box<dyn Behaviour<T>>>,
+    component_refs: ComponentRefs, // component definitions, flag position & amount of components available
 }
 
-#[allow(dead_code)]
-impl ECS {
-    pub fn new (entity_stack_size: usize) -> Self {
-        ECS { 
-            entity_stack_size, 
-            entities: Entities::new(entity_stack_size),
+impl<T: Default + Debug> Ecs<T> {
+
+    pub fn new() -> Self {
+        let mut create_entities = Vec::<BitFlags>::with_capacity(MAX_OBJECTS);
+        create_entities.resize_with(MAX_OBJECTS, Default::default);
+
+        let mut free = Vec::with_capacity(MAX_OBJECTS);
+        for i in 0..MAX_OBJECTS { free.push(i); }
+
+        Ecs { 
+            objects: Objects::new(),
+            entities: Entities::new(),
+            systems: Vec::new(),
+            behaviours:Vec::new(),
+            component_refs: ComponentRefs(Vec::new()),
         }
     }
 
-    pub fn system_build<C, F> (&self, update_actor: F) -> System<C>
-        where
-            C: Component,
-            F: FnMut(&Entity, C) -> C + 'static
-    {
-        System::<C>::new(self.entity_stack_size, update_actor)
+    pub fn start(&mut self) {
+        // update routine
+        for system in &mut self.systems {
+            self.behaviours[system.index].on_start(&mut self.objects, system);
+        }
+        // handle requests
+        for system in &mut self.systems {
+            if system.destroy_requests.len() > 0 || system.spawn_requests.len() > 0 {
+                system.handle_requests(&mut self.objects, &mut self.entities, &self.component_refs);
+            }
+        }
     }
 
-    pub fn entity_spawn (&mut self, name: &str) -> Option<Entity> {
-        self.entities.spawn(name)
+    pub fn update(&mut self) {
+        // update routine
+        for system in &mut self.systems {
+            for pointer in &self.entities.active {
+                if system.components.0 == 
+                    self.entities.pool[*pointer].0 & system.components.0 
+                {
+                    self.behaviours[system.index].on_update(&pointer, &mut self.objects, system);
+                }
+            }
+        }
+        // handle requests
+        for system in &mut self.systems {
+            if system.destroy_requests.len() > 0 || system.spawn_requests.len() > 0 {
+                system.handle_requests(&mut self.objects, &mut self.entities, &self.component_refs);
+            }
+        }
     }
 
-    pub fn entity_destroy (&mut self, e: &Entity) {
-        self.entities.destroy(e)
+    pub fn define_system(&mut self, behaviour: Box<dyn Behaviour<T>>) {
+        let mut components = BitFlags (0);
+
+        for s in &mut behaviour.required_components().iter() {
+            if let Some(c) = self.component_refs.get(s) {
+                components.set_bit(*c.index(), true)
+            }
+        }
+        self.behaviours.push(behaviour);
+        self.systems.push(System::new(self.systems.len(), components));
     }
 
-    pub fn entity_by_name (&self, name: &str) -> Option<Entity> {
-        self.entities.find(|_i, n| n == name)
+    // setup new components by giving them a name and a flag position
+    pub fn define_component(&mut self, name: &str) {
+        self.component_refs.0.push(ComponentRef::new(self.component_refs.0.len(), name));
     }
 
-    pub fn entity_by_index (&self, index: usize) -> Option<Entity> {
-        self.entities.find(|i, _n| *i == index)
+    pub fn components(&self) -> &ComponentRefs {
+        &self.component_refs
+    }
+
+    // pub fn add_component(&mut self, target: &usize, component: &ComponentIndex) {
+    //     self.entities[*target].set_bit(*component, true);
+    // }
+
+    // pub fn remove_component(&mut self, target: &usize, component: &ComponentIndex) {
+    //     self.entities[*target].set_bit(*component, false);
+    // }
+
+    pub fn spawn(&mut self, name: &NameTag, components: Vec<NameTag>) {
+        create_object(
+            name,
+            components,
+            &mut self.objects.active,
+            &mut self.entities,
+            &mut self.component_refs,
+        )
+    }
+
+    pub fn destroy(&mut self, target: &ObjectIndex) {
+        destroy_object(
+            target, 
+            &mut self.objects.active,
+            &mut self.entities
+        )
     }
 }
 
+// DRY METHODES
 
-#[cfg(test)]
-mod tests {
+fn create_object(
+    name: &NameTag, 
+    components: Vec<NameTag>, 
+    objects_active: &mut Vec<(ObjectIndex, NameTag)>,
+    entities: &mut Entities,
+    component_refs: &ComponentRefs,
+) {
+    if let Some(pointer) = entities.free.pop() {
 
-    use super::*;
+        entities.active.push(pointer);
+        objects_active.push((pointer, name.clone()));
+        entities.pool[pointer].reset();
 
-    #[derive(Clone)]
-    struct Position (f32, f32);
-
-    impl Component for Position {
-        fn blank() -> Self { Position(0.0, 0.0) }
-    }
-
-    impl ToString for Position {
-        fn to_string(&self) -> String {
-            format!("Position({}, {})", self.0, self.1)
+        for comp in components {
+            if let Some(c) = component_refs.get(&comp) {
+                entities.pool[pointer].set_bit(*c.index(), true)
+            }
         }
     }
+}
 
-    fn move_updater (e: &Entity, mut c: Position) -> Position {
-        c.0 += 1.0; 
-        println!("updated '{}' to {}", e.name(), c.to_string());
-        c 
-    }
-
-    #[test]
-    fn usecase() {
-        let mut ecs = ECS::new(100);
-        let mut move_system = ecs.system_build(move_updater);
-
-        let entity1 = ecs.entity_spawn("tester").unwrap();
-        let entity2 = ecs.entity_spawn("test entity").unwrap();
-        let entity3 = ecs.entity_spawn("entity").unwrap();
-        move_system.activate(&entity1);
-        move_system.activate(&entity2);
-        move_system.activate(&entity3);
-
-        let mut j = 0;
-        for i in 1..10 {
-            
-            if i % 2 == 0 { move_system.activate(&entity1); j += 1; }
-            else { move_system.deactivate(&entity1); }
-
-            move_system.update_active_entities();
-
-            let component1 = move_system.component(&entity1);
-            let component2 = move_system.component(&entity2);
-            let component3 = move_system.component(&entity3);
-            assert_eq!(j as f32, component1.0);
-            assert_eq!(i as f32, component2.0);
-            assert_eq!(i as f32, component3.0);
-        }
+fn destroy_object(
+    target: &ObjectIndex, 
+    objects_active: &mut Vec<(ObjectIndex, NameTag)>,
+    entities: &mut Entities,
+) {
+    if let Some(i) = entities.active.iter().position(|pointer| pointer == target) {
+        entities.active.remove(i);
+        objects_active.remove(i);
+        entities.free.push(i);
     }
 }
