@@ -2,59 +2,39 @@ use std::fmt::Debug;
 use std::convert::TryInto;
 use std::time::{SystemTime};
 
-// enum Action { 
-//     Spawn(NameTag), 
-//     Destroy(ObjectIndex),
-//     AddComponent(ObjectIndex, NameTag), 
-//     RemoveComponent(ObjectIndex, NameTag),
-// }
-
-// struct Actions(Vec<Action>);
-
-// impl Actions {
-//     fn new() -> Self { Self(Vec::new()) }
-    
-//     pub fn spawn(&mut self, name: &str) {
-//         self.0.push(Action::Spawn(NameTag::from_str(name)));
-//     }
-
-//     pub fn destroy(&mut self, target: usize) {
-//         self.0.push(Action::Destroy(target));
-//     }
-
-//     pub fn add_component(&mut self, target: usize, component_name: &str) {
-//         self.0.push(
-//             Action::AddComponent(target, NameTag::from_str(component_name))
-//         );
-//     }
-
-//     pub fn remove_component(&mut self, target: usize, component_name: &str) {
-//         self.0.push(
-//             Action::RemoveComponent(target, NameTag::from_str(component_name))
-//         );
-//     }
-
-//     pub fn clear(&mut self) {
-//         self.0.clear();
-//     }
-
-//     pub fn list(&self) -> &Vec<Action> {
-//         &self.0
-//     }
-// }
 
 const MAX_OBJECTS: usize = 10000;
 
-type Objects<T> = [T; MAX_OBJECTS];
 type Entities = [BitFlags; MAX_OBJECTS];
 type ObjectIndex = usize;
 type ComponentIndex = usize;
 
+struct Objects<T: Default> {
+    pool: [T; MAX_OBJECTS],
+    active: Vec<(ObjectIndex, NameTag)>,
+}
+
+impl<T: Default> Objects<T> {
+
+    pub fn get_mut(&mut self, target: &ObjectIndex) -> &mut T {
+        &mut self.pool[*target]
+    }
+
+    pub fn get_ref(&mut self, target: &ObjectIndex) -> &T {
+        &self.pool[*target]
+    }
+
+    pub fn find(&mut self, name: &str) -> Option<&ObjectIndex> {
+        let tag = NameTag::from_str(name);
+        self.active.iter().find(|x| x.1 == tag).map(|a| &a.0)
+    }
+}
+
 struct Ecs<T: Default> { 
     objects: Objects<T>, // object data pool, in other words entity component data
     entities: Entities, // object component implementation flags
-    systems: Vec<Box<dyn System<T>>>, // behaviour wrappers for executing custom behaviour scripts
-    components: Vec<Component>, // component definitions, flag position & amount of components available
+    systems: Vec<System<T>>, // behaviour wrappers for executing custom behaviour scripts
+    components: ComponentRefs, // component definitions, flag position & amount of components available
     //actions: Actions, // perform actions that can only be handled after the update sequence
     active: Vec<ObjectIndex>,
     free: Vec<ObjectIndex>,
@@ -73,11 +53,13 @@ impl<T: Default + Debug> Ecs<T> {
         for i in 0..MAX_OBJECTS { free.push(i); }
 
         Ecs { 
-            objects: create_objects.try_into().unwrap(),
+            objects: Objects { 
+                pool: create_objects.try_into().unwrap(),
+                active: Vec::new(),
+            },
             entities: create_entities.try_into().unwrap(),
             systems: Vec::new(),
-            components: Vec::new(),
-           // actions: Actions::new(),
+            components: ComponentRefs(Vec::new()),
             active: Vec::new(),
             free,
         }
@@ -88,57 +70,29 @@ impl<T: Default + Debug> Ecs<T> {
         for system in &mut self.systems {
             for pointer in &self.active {
                 if self.entities[*pointer].0 == 
-                    self.entities[*pointer].0 & system.requires_components().0 
+                    self.entities[*pointer].0 & system.component_flags().0 
                 {
-                    system.update(&pointer, &mut self.objects, &self.active);//, &mut self.actions);
+                    system.behaviour.update(&pointer, &mut self.objects);//, &mut self.actions);
                 }
             }
         }
 
         // handle actions
-        // for action in self.actions.list() {
-        //     match action {
-        //         Action::Spawn(s) => {
-        //             if self.objects.spawn().is_some() {
-        //                 if let Some(pointer) = self.entities.spawn() {
-        //                     self.entities.edit(&pointer).rename(s);
-        //                 }
-        //             }
-        //         }, 
-        //         Action::Destroy(p) => { 
-        //             self.objects.destroy(p);
-        //             self.entities.destroy(p);
-        //         }, 
-        //         Action::AddComponent(p, s) => {
-        //             if let Some(component) = self.components.get(s) {
-        //                 self.entities.edit(p).add_component(component.clone());
-        //             }
-        //         }, 
-        //         Action::RemoveComponent(p, s) => {
-        //             if let Some(component) = self.components.get(s) {
-        //                 self.entities.edit(p).remove_component(component.clone());
-        //             }
-        //         }, 
-        //     }
-        // }
-        // self.actions.clear();
     }
 
-    pub fn define_system(&mut self, name: &str, system: Box<dyn System<T>>) {
-        let index = self.systems.len();
-        self.systems.push(system);
-        self.systems[index].init(&self.components);
+    pub fn define_system(&mut self, behaviour: Box<dyn Behaviour<T>>) {
+        self.systems.push(System::new(behaviour, &self.components));
     }
 
     // setup new components by giving them a name and a flag position
     pub fn define_component(&mut self, name: &str) -> ComponentIndex {
-        let comp_index = self.components.len();
-        self.components.push(Component::new(comp_index.clone(), name));
+        let comp_index = self.components.0.len();
+        self.components.0.push(ComponentRef::new(comp_index.clone(), name));
         comp_index
     }
 
-    pub fn get_component(&self, name: &str) -> Option<&Component> {
-        self.components.iter().find(|x| *x.name() == NameTag::from_str(name))
+    pub fn get_component(&self, name: &str) -> Option<&ComponentRef> {
+        self.components.0.iter().find(|x| *x.name() == NameTag::from_str(name))
     }
 
     pub fn add_component(&mut self, target: &usize, component: &ComponentIndex) {
@@ -152,6 +106,7 @@ impl<T: Default + Debug> Ecs<T> {
     pub fn spawn(&mut self, name: &str) -> Option<usize> {
         if let Some(pointer) = self.free.pop() {
             self.active.push(pointer);
+            self.objects.active.push((pointer, NameTag::from_str(name)));
             return Some(pointer);
         }
         None
@@ -160,13 +115,14 @@ impl<T: Default + Debug> Ecs<T> {
     pub fn destroy(&mut self, target: &usize){
         if let Some(i) = self.active.iter().position(|pointer| pointer == target) {
             self.active.remove(i);
+            self.objects.active.remove(i);
             self.free.push(i);
         }
     }
 }
 
 #[derive(Default, Clone, PartialEq)]
-struct NameTag([u8; 16]);
+struct NameTag ([u8; 16]);
 
 impl NameTag {
     pub fn from_str(s: &str) -> Self {
@@ -191,15 +147,30 @@ impl NameTag {
     }
 }
 
+
+struct ComponentRefs(Vec<ComponentRef>);
+
+impl ComponentRefs {
+
+    pub fn get(&self, tag: &NameTag) -> Option<&ComponentRef> {
+        self.0.iter().find(|c| c.name == *tag)
+    }
+
+    pub fn list(&self) -> &Vec<ComponentRef> {
+        &self.0
+    }
+}
+
+
 #[derive(Clone)]
-struct Component {
+struct ComponentRef {
     index: usize,
     name: NameTag,
 }
 
-impl Component {
+impl ComponentRef {
     fn new(index: usize, name: &str) -> Self {
-        Component {
+        ComponentRef {
             index,
             name: NameTag::from_str(name),
         }
@@ -210,20 +181,6 @@ impl Component {
 
     pub fn compare_str(&self, name: &str) -> bool {
         self.name == NameTag::from_str(name)
-    }
-}
-
-type ComponentList = BitFlags;
-
-impl ComponentList {
-    fn new() -> Self { Self(0) }
-    fn add(&mut self, component: Component) {
-        self.set_bit(*component.index(), true)
-    }
-}
-impl PartialEq for ComponentList {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
     }
 }
 
@@ -240,11 +197,44 @@ impl BitFlags {
     pub fn disable_bits(&mut self, bits: u32) { self.0 &= !bits }
 }
 
-trait System<T: Default> {
-    fn init(&mut self, components: &Vec<Component>);
-    fn requires_components(&self) -> &ComponentList;
-    fn update(&mut self, target: &ObjectIndex, objects: &mut Objects<T>, active: &Vec<usize>);//, actions: &mut Actions);
-    //fn on_spawn_response(&mut self, spawn: &mut Entity, object: &mut T);
+struct System<T: Default> {
+    behaviour: Box<dyn Behaviour<T>>,
+    spawn_req: Vec<ObjectIndex>,
+    destroy_req: Vec<ObjectIndex>,
+    components: BitFlags,
+}
+
+impl<T: Default> System<T> {
+
+    fn new(behaviour: Box<dyn Behaviour<T>>, component_refs: &ComponentRefs) -> Self {
+        let mut components = BitFlags (0);
+
+        for s in &mut behaviour.required_components().iter() {
+            if let Some(c) = component_refs.get(s) {
+                components.set_bit(*c.index(), true)
+            }
+        }
+
+        System {
+            behaviour,
+            spawn_req: Vec::new(),
+            destroy_req: Vec::new(),
+            components,
+        }
+    }
+
+    fn component_flags(&self) -> &BitFlags {
+        &self.components
+    }
+
+    fn add_component(&mut self, component: ComponentRef) {
+        self.components.set_bit(*component.index(), true)
+    }
+}
+
+trait Behaviour<T: Default> {
+    fn required_components(&self) -> Vec<NameTag>;
+    fn update(&mut self, target: &ObjectIndex, objects: &mut Objects<T>);
 }
 
 
@@ -258,9 +248,9 @@ fn main() {
     let comp2 = ecs.define_component("call-2").clone();
     let comp3 = ecs.define_component("call-3").clone();
 
-    let system1 = ecs.define_system("system-call-1", Box::new(Call1::new()));
-    let system2 = ecs.define_system("system-call-2", Box::new(Call2::new()));
-    let system3 = ecs.define_system("system-call-3", Box::new(Call3::new()));
+    let system1 = ecs.define_system(Box::new(Call1));
+    let system2 = ecs.define_system(Box::new(Call2));
+    let system3 = ecs.define_system(Box::new(Call3));
 
     let entity1 = ecs.spawn("entity-1").unwrap();
     ecs.add_component(&entity1, &comp1);
@@ -285,9 +275,9 @@ fn main() {
             Err(e)      => println!("Error: {:?}", e),
         }
 
-        // println!(" - result 1: {}, {}, {}", ecs.scene.borrow(&entity1).call1.clone(), ecs.scene.borrow(&entity1).call2.clone(), ecs.scene.borrow(&entity1).call3.clone());
-        // println!(" - result 2: {}, {}, {}", ecs.scene.borrow(&entity2).call1.clone(), ecs.scene.borrow(&entity2).call2.clone(), ecs.scene.borrow(&entity2).call3.clone());
-        // println!(" - result 3: {}, {}, {}", ecs.scene.borrow(&entity3).call1.clone(), ecs.scene.borrow(&entity3).call2.clone(), ecs.scene.borrow(&entity3).call3.clone());
+        // println!(" - result 1: {}, {}, {}", ecs.objects.get_ref(&entity1).call1.clone(), ecs.objects.get_ref(&entity1).call2.clone(), ecs.objects.get_ref(&entity1).call3.clone());
+        // println!(" - result 2: {}, {}, {}", ecs.objects.get_ref(&entity2).call1.clone(), ecs.objects.get_ref(&entity2).call2.clone(), ecs.objects.get_ref(&entity2).call3.clone());
+        // println!(" - result 3: {}, {}, {}", ecs.objects.get_ref(&entity3).call1.clone(), ecs.objects.get_ref(&entity3).call2.clone(), ecs.objects.get_ref(&entity3).call3.clone());
     }
 }
 
@@ -300,80 +290,43 @@ struct Cell {
 
 
 #[derive(Default)]
-struct Call1 (ComponentList);
+struct Call1;
 
-impl Call1 {
-    pub fn new() -> Self { Self (ComponentList::new()) }
-}
+impl Behaviour<Cell> for Call1 {
 
-impl System<Cell> for Call1 {
-
-    fn init(&mut self, components: &Vec<Component>) {
-        if let Some(c) = components.iter().find(|c| c.compare_str("call-1") ) {
-            self.0.add(c.clone());
-        }
+    fn required_components(&self) -> Vec<NameTag> { 
+        vec![ NameTag::from_str("call-1") ] 
     }
 
-    fn requires_components(&self) -> &ComponentList { &self.0 }
-
-    fn update(&mut self, target: &ObjectIndex, objects: &mut Objects<Cell>, active: &Vec<usize>) {//, actions: &mut Actions) {
-        objects[*target].call1 += 1;
-        //actions.spawn("test");
+    fn update(&mut self, target: &ObjectIndex, objects: &mut Objects<Cell>) {
+        objects.get_mut(target).call1 += 1;
     }
-
-    // fn on_spawn_response(&mut self, spawn: &mut Entity, object: &mut Cell) {
-
-    // }
 }
 
 #[derive(Default)]
-struct Call2 (ComponentList);
+struct Call2;
 
-impl Call2 {
-    pub fn new() -> Self { Self (ComponentList::new()) }
-}
+impl Behaviour<Cell> for Call2 {
 
-impl System<Cell> for Call2 {
-
-    fn init(&mut self, components: &Vec<Component>) {
-        if let Some(c) = components.iter().find(|c| c.compare_str("call-2") ) {
-            self.0.add(c.clone());
-        }
+    fn required_components(&self) -> Vec<NameTag> { 
+        vec![ NameTag::from_str("call-2") ] 
     }
 
-    fn requires_components(&self) -> &ComponentList { &self.0 }
-
-    fn update(&mut self, target: &ObjectIndex, objects: &mut Objects<Cell>, active: &Vec<usize>){//, actions: &mut Actions) {
-        objects[*target].call2 += 1
+    fn update(&mut self, target: &ObjectIndex, objects: &mut Objects<Cell>) {
+        objects.get_mut(target).call2 += 1
     }
-
-    // fn on_spawn_response(&mut self, spawn: &mut Entity, object: &mut Cell) {
-
-    // }
 }
 
 #[derive(Default)]
-struct Call3 (ComponentList);
+struct Call3;
 
-impl Call3 {
-    pub fn new() -> Self { Self (ComponentList::new()) }
-}
+impl Behaviour<Cell> for Call3 {
 
-impl System<Cell> for Call3 {
-
-    fn init(&mut self, components: &Vec<Component>) {
-        if let Some(c) = components.iter().find(|c| c.compare_str("call-3") ) {
-            self.0.add(c.clone());
-        }
+    fn required_components(&self) -> Vec<NameTag> { 
+        vec![ NameTag::from_str("call-3") ] 
     }
 
-    fn requires_components(&self) -> &ComponentList { &self.0 }
-
-    fn update(&mut self, target: &ObjectIndex, objects: &mut Objects<Cell>, active: &Vec<usize>){//, actions: &mut Actions) {
-        objects[*target].call3 += 1;
+    fn update(&mut self, target: &ObjectIndex, objects: &mut Objects<Cell>) {
+        objects.get_mut(target).call3 += 1;
     }
-
-    // fn on_spawn_response(&mut self, spawn: &mut Entity, object: &mut Cell) {
-
-    // }
 }
