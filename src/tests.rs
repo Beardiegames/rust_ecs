@@ -6,15 +6,16 @@ use super::*;
 #[test]
 fn speed() {
 
-    let mut ecs = Ecs::new();
-
-    ecs.define_component("call-1");
-    ecs.define_component("call-2");
-    ecs.define_component("call-3");
-
-    ecs.define_system(Box::new(Call1));
-    ecs.define_system(Box::new(Call2));
-    ecs.define_system(Box::new(Call3));
+    let mut ecs = EcsBuilder::new()
+        .define_component("call-1")
+        .define_component("call-2")
+        .define_component("call-3")
+        .next()
+        
+        .define_system(Box::new(Call1))
+        .define_system(Box::new(Call2))
+        .define_system(Box::new(Call3))
+        .finalize();
 
     ecs.spawn(&NameTag::from_str("entity-1"), vec![NameTag::from_str("call-1")]);
     ecs.spawn(&NameTag::from_str("entity-2"), vec![NameTag::from_str("call-2")]);
