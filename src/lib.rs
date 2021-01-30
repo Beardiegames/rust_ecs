@@ -5,9 +5,9 @@ mod types;
 mod tests;
 
 use std::fmt::Debug;
-use pool::{ Objects, Entities };
-use systems::{ System, Behaviour };
-use types::{ NameTag, ComponentRefs, ComponentRef, BitFlags };
+pub use pool::{ Objects, Entities };
+pub use systems::{ System, Behaviour };
+pub use types::{ NameTag, ComponentRefs, ComponentRef, BitFlags };
 
 
 const MAX_OBJECTS: usize = 1000;
