@@ -7,19 +7,25 @@ use super::*;
 fn update_speed() {
 
     let mut ecs = EcsBuilder::new()
-        .define_component("call-1")
-        .define_component("call-2")
-        .define_component("call-3")
-        .next()
-        
-        .define_system(Box::new(Call1))
-        .define_system(Box::new(Call2))
-        .define_system(Box::new(Call3))
+            .define_component("call-1")
+            .define_component("call-2")
+            .define_component("call-3")
+        .build_systems()
+
+            .define_system(Box::new(Call1))
+            .define_system(Box::new(Call2))
+            .define_system(Box::new(Call3))
+        .setup_factories()
+
+            .define_factory("type-1", Box::new(factory_1))
+            .define_factory("type-2", Box::new(factory_2))
+            .define_factory("type-3", Box::new(factory_3))
         .finalize();
 
-    ecs.spawn(&NameTag::from_str("entity-1"), vec![NameTag::from_str("call-1")]);
-    ecs.spawn(&NameTag::from_str("entity-2"), vec![NameTag::from_str("call-2")]);
-    ecs.spawn(&NameTag::from_str("entity-3"), vec![NameTag::from_str("call-3")]);
+
+    ecs.spawn("entity-1", "type-1");
+    ecs.spawn("entity-2", "type-2");
+    ecs.spawn("entity-3", "type-3");
     ecs.start();
 
     let num_updates: u128 = 100_000_000;
@@ -66,11 +72,13 @@ fn update_speed() {
 #[test]
 fn open_update_speed() {
 
-    let mut ecs = EcsBuilder::new()
-        .next::<Cell>()
+    let mut ecs:Ecs<Cell> = EcsBuilder::new()
+        .build_systems()
+        .setup_factories()
+            .define_factory("type-1", Box::new(factory_1))
         .finalize();
 
-    ecs.spawn(&NameTag::from_str("entity-1"), vec![]);
+    ecs.spawn("entity-1", "type-1");
     ecs.start();
     
     let num_updates: u128 = 100_000_000;
@@ -102,6 +110,18 @@ struct Cell {
     pub call3: u128,
 }
 
+fn factory_1<'a, T: Default>(tools: &mut BuildTools<T>) {
+    tools.add_component("call-1")
+}
+
+fn factory_2<'a, T: Default>(tools: &mut BuildTools<T>) {
+    tools.add_component("call-2")
+}
+
+fn factory_3<'a, T: Default>(tools: &mut BuildTools<T>) {
+    tools.add_component("call-3")
+}
+
 
 #[derive(Default)]
 struct Call1;
@@ -114,7 +134,7 @@ impl Behaviour<Cell> for Call1 {
 
     #[allow(unused_variables)]
     fn on_start(&mut self, objects: &mut Objects<Cell>, system: &mut System) {
-        system.spawn("test", vec![ NameTag::from_str("call-1") ]);
+        system.spawn("test", "type-2");
     }
 
     #[allow(unused_variables)]

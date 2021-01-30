@@ -1,21 +1,10 @@
 
-use super::{
-    SystemIndex,
-    ObjectIndex,
-    ComponentRefs,
-    //ComponentRef,
-    NameTag,
-    BitFlags,
-};
-
-use super::pool::{
-    Objects,
-    Entities
-};
+use super::*;
+use super::pool::*;
 
 pub struct System {
     pub(crate) index: SystemIndex,
-    pub(crate) spawn_requests: Vec<(NameTag, Vec<NameTag>)>,
+    pub(crate) spawn_requests: Vec<(NameTag, String)>,
     pub(crate) destroy_requests: Vec<ObjectIndex>,
     pub(crate) components: BitFlags,
 }
@@ -36,15 +25,16 @@ impl System {
         &mut self, 
         objects: &mut Objects<T>,
         entities: &mut Entities,
+        factories: &mut Vec<(String, Box<Factory<T>>)>,
         component_refs: &ComponentRefs,
     ) {
         // destroy requests
         while self.destroy_requests.len() > 0 {
             if let Some(target) = self.destroy_requests.pop() {
                 super::destroy_object(
-                    &target, 
-                    &mut objects.active,
-                    entities
+                    &target,           
+                    entities,
+                    objects,
                 )
             }
         }
@@ -52,22 +42,24 @@ impl System {
         while self.spawn_requests.len() > 0 {
             if let Some(spawn) = self.spawn_requests.pop() {
                 super::create_object(
-                    &spawn.0,
-                    spawn.1,
-                    &mut objects.active,
+                    spawn.0,
+                    &spawn.1,
                     entities,
-                    component_refs,
+                    objects,
+                    factories,
+                    &component_refs,
                 );
             }
         }
+        
     }
 
     // pub(crate) fn add_component(&mut self, component: ComponentRef) {
     //     self.components.set_bit(*component.index(), true)
     // }
 
-    pub fn spawn(&mut self, name: &str, components: Vec<NameTag>) {
-        self.spawn_requests.push((NameTag::from_str(name), components));
+    pub fn spawn(&mut self, new_name: &str, type_of: &str) {
+        self.spawn_requests.push((NameTag::from_str(new_name), type_of.to_string()));
     }
 
     pub fn destroy(&mut self, target: &ObjectIndex) {
