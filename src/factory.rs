@@ -2,18 +2,18 @@
 use super::{ NameTag, ComponentRefs, BitFlags };
 
 
-pub trait Factory<'a, T: Default> {
+pub trait Factory<'a, T> {
     fn make_spawn(&mut self, tools: &mut BuildTools<T>);
 }
 
 
-pub struct BuildTools<'a, T: Default> {
+pub struct BuildTools<'a, T> {
     object: &'a mut T,
     component_refs: &'a ComponentRefs,
     entity: &'a mut BitFlags,
 }
 
-impl<'a, T: Default> BuildTools<'a, T> {
+impl<'a, T> BuildTools<'a, T> {
 
     pub fn new(
         object: &'a mut T,
