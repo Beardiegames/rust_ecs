@@ -4,7 +4,7 @@ use std::time::SystemTime;
 use super::*;
 
 #[test]
-fn speed() {
+fn update_speed() {
 
     let mut ecs = EcsBuilder::new()
         .define_component("call-1")
@@ -20,12 +20,10 @@ fn speed() {
     ecs.spawn(&NameTag::from_str("entity-1"), vec![NameTag::from_str("call-1")]);
     ecs.spawn(&NameTag::from_str("entity-2"), vec![NameTag::from_str("call-2")]);
     ecs.spawn(&NameTag::from_str("entity-3"), vec![NameTag::from_str("call-3")]);
+    ecs.start();
 
     let num_updates: u128 = 100_000_000;
     let num_calls: f64 = 3.0 * num_updates as f64;
-
-    ecs.start();
-    
     let now = SystemTime::now();
 
     for _i in 0..num_updates { ecs.update(); }
@@ -60,6 +58,37 @@ fn speed() {
             ecs.objects.get_ref(test).call1, 
             ecs.objects.get_ref(test).call2, 
             ecs.objects.get_ref(test).call3
+        );
+    }
+    assert!(false);
+}
+
+#[test]
+fn open_update_speed() {
+
+    let mut ecs = EcsBuilder::new()
+        .next::<Cell>()
+        .finalize();
+
+    ecs.spawn(&NameTag::from_str("entity-1"), vec![]);
+    ecs.start();
+    
+    let num_updates: u128 = 100_000_000;
+    let now = SystemTime::now();
+
+    for _i in 0..num_updates { 
+        ecs.open_update(|obj| obj.call1 += 1 ); 
+    }
+
+    let elapsed_res = now.elapsed();
+    match elapsed_res {
+        Ok(elapsed) => println!("updates {} M calls/s", 1_000.0 / elapsed.as_nanos() as f64),
+        Err(e)      => println!("Error: {:?}", e),
+    }
+
+    if let Some(entity1) = ecs.objects.find("entity-1") {
+        println!(" - result 1: {}", 
+            ecs.objects.get_ref(entity1).call1, 
         );
     }
     assert!(false);

@@ -153,10 +153,11 @@ impl<T: Default + Debug> Ecs<T> {
         }
     }
 
-    pub fn custom_update<F>(&mut self, custom_update_methode: &mut F )
+    // extremely slow!
+    pub fn open_update<F>(&mut self, mut update_methode: F )
     where F: FnMut(&mut T) {
         for pointer in &self.entities.active {
-            custom_update_methode(self.objects.get_mut(&pointer));
+            update_methode(&mut self.objects.pool[*pointer]);
         }
     }
 
