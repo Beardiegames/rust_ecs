@@ -119,7 +119,7 @@ pub struct Ecs<T: Default> {
     component_refs: ComponentRefs, // component definitions, flag position & amount of components available
 }
 
-impl<T: Default> Ecs<T> {
+impl<T: Default + Debug> Ecs<T> {
 
     pub fn start(&mut self) {
         // update routine
@@ -150,6 +150,13 @@ impl<T: Default> Ecs<T> {
             if system.destroy_requests.len() > 0 || system.spawn_requests.len() > 0 {
                 system.handle_requests(&mut self.objects, &mut self.entities, &self.component_refs);
             }
+        }
+    }
+
+    pub fn custom_update<F>(&mut self, custom_update_methode: &mut F )
+    where F: FnMut(&mut T) {
+        for pointer in &self.entities.active {
+            custom_update_methode(self.objects.get_mut(&pointer));
         }
     }
 
