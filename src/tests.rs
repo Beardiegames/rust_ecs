@@ -17,9 +17,9 @@ fn update_speed() {
             .define_system(Box::new(Call3))
         .setup_factories()
 
-            .define_factory("type-1", Box::new(factory_1))
-            .define_factory("type-2", Box::new(factory_2))
-            .define_factory("type-3", Box::new(factory_3))
+            .define_factory("type-1", Box::new(Factory1))
+            .define_factory("type-2", Box::new(Factory2))
+            .define_factory("type-3", Box::new(Factory3))
         .finalize();
 
 
@@ -75,7 +75,7 @@ fn open_update_speed() {
     let mut ecs:Ecs<Cell> = EcsBuilder::new()
         .build_systems()
         .setup_factories()
-            .define_factory("type-1", Box::new(factory_1))
+            .define_factory("type-1", Box::new(Factory1))
         .finalize();
 
     ecs.spawn("entity-1", "type-1");
@@ -110,16 +110,25 @@ struct Cell {
     pub call3: u128,
 }
 
-fn factory_1<'a, T: Default>(tools: &mut BuildTools<T>) {
-    tools.add_component("call-1")
+struct Factory1;
+impl<'a, T: Default> Factory<'a, T> for Factory1 {
+    fn make_spawn(&mut self, tools: &mut BuildTools<T>) {
+        tools.add_component("call-1")
+    }
 }
 
-fn factory_2<'a, T: Default>(tools: &mut BuildTools<T>) {
-    tools.add_component("call-2")
+struct Factory2;
+impl<'a, T: Default> Factory<'a, T> for Factory2 {
+    fn make_spawn(&mut self, tools: &mut BuildTools<T>) {
+        tools.add_component("call-2")
+    }
 }
 
-fn factory_3<'a, T: Default>(tools: &mut BuildTools<T>) {
-    tools.add_component("call-3")
+struct Factory3;
+impl<'a, T: Default> Factory<'a, T> for Factory3 {
+    fn make_spawn(&mut self, tools: &mut BuildTools<T>) {
+        tools.add_component("call-3")
+    }
 }
 
 

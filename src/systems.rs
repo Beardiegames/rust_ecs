@@ -21,11 +21,11 @@ impl System {
         }
     }
 
-    pub(crate) fn handle_requests<T: Default> (
+    pub(crate) fn handle_requests<'a, T: Default> (
         &mut self, 
         objects: &mut Objects<T>,
         entities: &mut Entities,
-        factories: &mut Vec<(String, Box<Factory<T>>)>,
+        factories: &mut Vec<(String, Box<dyn Factory<'a, T>>)>,
         component_refs: &ComponentRefs,
     ) {
         // destroy requests

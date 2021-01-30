@@ -50,7 +50,7 @@ pub struct SystemBuilder<T: Default> {
     behaviours: Vec<Box<dyn Behaviour<T>>>
 }
 
-impl<T: Default> SystemBuilder<T> {
+impl<'a, T: Default> SystemBuilder<T> {
 
     pub fn define_system(mut self, behaviour: Box<dyn Behaviour<T>>) -> Self {
         let mut components = BitFlags (0);
@@ -65,7 +65,7 @@ impl<T: Default> SystemBuilder<T> {
         self
     }
 
-    pub fn setup_factories(self) -> FactoryBuilder<T> {
+    pub fn setup_factories(self) -> FactoryBuilder<'a, T> {
         FactoryBuilder { 
             systems: self.systems,
             behaviours: self.behaviours,
@@ -76,22 +76,22 @@ impl<T: Default> SystemBuilder<T> {
 }
 
 // secondly define systems
-pub struct FactoryBuilder<T: Default> {
+pub struct FactoryBuilder<'a, T: Default> {
     component_refs: ComponentRefs, 
     systems: Vec<System>, 
     behaviours: Vec<Box<dyn Behaviour<T>>>,
-    factories: Vec<(String, Box<Factory<T>>)>,
+    factories: Vec<(String, Box<dyn Factory<'a, T>>)>,
 }
 
 
-impl<T: Default + Debug> FactoryBuilder<T> {
+impl<'a, T: Default + Debug> FactoryBuilder<'a, T> {
 
-    pub fn define_factory(mut self, type_name: &str, spawn_factory: Box<Factory<T>>) -> Self {
+    pub fn define_factory(mut self, type_name: &str, spawn_factory: Box<dyn Factory<'a, T>>) -> Self {
         self.factories.push((type_name.to_string(), spawn_factory));
         self
     }
 
-    pub fn finalize(self) -> Ecs<T> {
+    pub fn finalize(self) -> Ecs<'a, T> {
         Ecs { 
             objects: Objects::new(),
             entities: Entities::new(),
@@ -105,16 +105,16 @@ impl<T: Default + Debug> FactoryBuilder<T> {
 
 
 // actual core ECS system
-pub struct Ecs<T: Default> { 
+pub struct Ecs<'a, T: Default> { 
     objects: Objects<T>, // object data pool, in other words entity component data
     entities: Entities, // object component implementation flags
     systems: Vec<System>, // behaviour wrappers for executing custom behaviour scripts
     behaviours: Vec<Box<dyn Behaviour<T>>>,
     component_refs: ComponentRefs, // component definitions, flag position & amount of components available
-    factories: Vec<(String, Box<Factory<T>>)>, // used for spawning predefined objects
+    factories: Vec<(String, Box<Factory<'a, T>>)>, // used for spawning predefined objects
 }
 
-impl<T: Default + Debug> Ecs<T> {
+impl<'a, T: Default + Debug> Ecs<'a, T> {
 
     pub fn start(&mut self) {
         // update routine
@@ -232,7 +232,7 @@ fn create_object<T: Default> (
                 &component_refs,
                 &mut entities.pool[pointer]
             );
-            factory.1(&mut build_tools);
+            factory.1.make_spawn(&mut build_tools);
         }
     }
     None
