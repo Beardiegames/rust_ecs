@@ -194,6 +194,10 @@ impl<T: Default + Debug> Ecs<T> {
     pub fn get_ref(&mut self, target: &ObjectIndex) -> &T {
         self.objects.get_ref(target)
     }
+
+    pub fn find(&self, name: &str) -> Option<ObjectIndex> {
+        self.objects.find(name)
+    }
 }
 
 // DRY implementations 

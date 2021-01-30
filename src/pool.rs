@@ -55,8 +55,8 @@ impl<T: Default + Debug> Objects<T> {
         &self.pool[*target]
     }
 
-    pub fn find(&self, name: &str) -> Option<&ObjectIndex> {
+    pub fn find(&self, name: &str) -> Option<ObjectIndex> {
         let tag = NameTag::from_str(name);
-        self.active.iter().find(|x| x.1 == tag).map(|a| &a.0)
+        self.active.iter().find(|x| x.1 == tag).map(|a| a.0)
     }
 }

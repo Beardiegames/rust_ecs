@@ -40,30 +40,30 @@ fn update_speed() {
         Err(e)      => println!("Error: {:?}", e),
     }
 
-    if let Some(entity1) = ecs.objects.find("entity-1") {
+    if let Some(entity1) = ecs.find("entity-1") {
         println!(" - result 1: {}, {}, {}", 
-            ecs.objects.get_ref(entity1).call1, 
-            ecs.objects.get_ref(entity1).call2, 
-            ecs.objects.get_ref(entity1).call3
+            ecs.get_ref(&entity1).call1.clone(), 
+            ecs.get_ref(&entity1).call2.clone(), 
+            ecs.get_ref(&entity1).call3.clone()
         );
     }
-    if let Some(entity2) = ecs.objects.find("entity-2") {
+    if let Some(entity2) = ecs.find("entity-2") {
         println!(" - result 2: {}, {}, {}", 
-            ecs.objects.get_ref(entity2).call1, 
-            ecs.objects.get_ref(entity2).call2, 
-            ecs.objects.get_ref(entity2).call3
+            ecs.get_ref(&entity2).call1.clone(), 
+            ecs.get_ref(&entity2).call2.clone(), 
+            ecs.get_ref(&entity2).call3.clone()
         );
-    }if let Some(entity3) = ecs.objects.find("entity-3") {
+    }if let Some(entity3) = ecs.find("entity-3") {
         println!(" - result 3: {}, {}, {}", 
-            ecs.objects.get_ref(entity3).call1, 
-            ecs.objects.get_ref(entity3).call2, 
-            ecs.objects.get_ref(entity3).call3
+            ecs.get_ref(&entity3).call1.clone(), 
+            ecs.get_ref(&entity3).call2.clone(), 
+            ecs.get_ref(&entity3).call3.clone()
         );
-    }if let Some(test) = ecs.objects.find("test") {
+    }if let Some(test) = ecs.find("test") {
         println!(" - test: {}, {}, {}", 
-            ecs.objects.get_ref(test).call1, 
-            ecs.objects.get_ref(test).call2, 
-            ecs.objects.get_ref(test).call3
+            ecs.get_ref(&test).call1.clone(), 
+            ecs.get_ref(&test).call2.clone(), 
+            ecs.get_ref(&test).call3.clone()
         );
     }
     assert!(false);
@@ -96,7 +96,7 @@ fn open_update_speed() {
 
     if let Some(entity1) = ecs.objects.find("entity-1") {
         println!(" - result 1: {}", 
-            ecs.objects.get_ref(entity1).call1, 
+            ecs.objects.get_ref(&entity1).call1, 
         );
     }
     assert!(false);
