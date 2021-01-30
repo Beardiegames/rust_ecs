@@ -12,9 +12,9 @@ pub use types::{ NameTag, ComponentRefs, ComponentRef, BitFlags };
 
 const MAX_OBJECTS: usize = 1000;
 
-type ObjectIndex = usize;
-type ComponentIndex = usize;
-type SystemIndex = usize;
+pub type ObjectIndex = usize;
+pub type ComponentIndex = usize;
+pub type SystemIndex = usize;
 
 // Some DRY methodes
 
