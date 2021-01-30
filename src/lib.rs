@@ -24,7 +24,8 @@ fn create_object(
     objects_active: &mut Vec<(ObjectIndex, NameTag)>,
     entities: &mut Entities,
     component_refs: &ComponentRefs,
-) {
+) -> Option<ObjectIndex> {
+
     if let Some(pointer) = entities.free.pop() {
 
         entities.active.push(pointer);
@@ -36,7 +37,9 @@ fn create_object(
                 entities.pool[pointer].set_bit(*c.index(), true)
             }
         }
+        return Some(pointer);
     }
+    None
 }
 
 fn destroy_object(
@@ -173,7 +176,7 @@ impl<T: Default + Debug> Ecs<T> {
     //     self.entities.pool[*target].set_bit(*component, false);
     // }
 
-    pub fn spawn(&mut self, name: &NameTag, components: Vec<NameTag>) {
+    pub fn spawn(&mut self, name: &NameTag, components: Vec<NameTag>) -> Option<ObjectIndex> {
         create_object(
             name,
             components,
@@ -189,5 +192,13 @@ impl<T: Default + Debug> Ecs<T> {
             &mut self.objects.active,
             &mut self.entities
         )
+    }
+
+    pub fn get_mut(&mut self, target: &ObjectIndex) -> &mut T {
+        self.objects.get_mut(target)
+    }
+
+    pub fn get_ref(&mut self, target: &ObjectIndex) -> &T {
+        self.objects.get_ref(target)
     }
 }

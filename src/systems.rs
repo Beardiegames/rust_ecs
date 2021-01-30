@@ -57,7 +57,7 @@ impl System {
                     &mut objects.active,
                     entities,
                     component_refs,
-                )
+                );
             }
         }
     }
