@@ -24,7 +24,7 @@ impl<'a, T> BuildTools<'a, T> {
         BuildTools { object, component_refs, entity }
     }
 
-    pub fn edit(&'a mut self) -> &'a mut T {
+    pub fn edit(&mut self) -> &mut T {
         self.object
     }
 

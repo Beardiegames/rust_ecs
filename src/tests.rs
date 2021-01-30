@@ -111,22 +111,23 @@ struct Cell {
 }
 
 struct Factory1;
-impl<'a, T: Default> Factory<'a, T> for Factory1 {
-    fn make_spawn(&mut self, tools: &mut BuildTools<T>) {
-        tools.add_component("call-1")
+impl<'a> Factory<'a, Cell> for Factory1 {
+    fn make_spawn(&mut self, tools: &mut BuildTools<Cell>) {
+        tools.add_component("call-1");
+        tools.edit().call1 = 0;
     }
 }
 
 struct Factory2;
-impl<'a, T: Default> Factory<'a, T> for Factory2 {
-    fn make_spawn(&mut self, tools: &mut BuildTools<T>) {
+impl<'a> Factory<'a, Cell> for Factory2 {
+    fn make_spawn(&mut self, tools: &mut BuildTools<Cell>) {
         tools.add_component("call-2")
     }
 }
 
 struct Factory3;
-impl<'a, T: Default> Factory<'a, T> for Factory3 {
-    fn make_spawn(&mut self, tools: &mut BuildTools<T>) {
+impl<'a> Factory<'a, Cell> for Factory3 {
+    fn make_spawn(&mut self, tools: &mut BuildTools<Cell>) {
         tools.add_component("call-3")
     }
 }

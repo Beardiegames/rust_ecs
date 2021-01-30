@@ -111,7 +111,7 @@ pub struct Ecs<'a, T: Default> {
     systems: Vec<System>, // behaviour wrappers for executing custom behaviour scripts
     behaviours: Vec<Box<dyn Behaviour<T>>>,
     component_refs: ComponentRefs, // component definitions, flag position & amount of components available
-    factories: Vec<(String, Box<Factory<'a, T>>)>, // used for spawning predefined objects
+    factories: Vec<(String, Box<dyn Factory<'a, T>>)>, // used for spawning predefined objects
 }
 
 impl<'a, T: Default + Debug> Ecs<'a, T> {
@@ -208,7 +208,7 @@ fn create_object<T: Default> (
 
     entities: &mut Entities,
     objects: &mut Objects<T>,
-    factories: &mut Vec<(String, Box<Factory<T>>)>,
+    factories: &mut Vec<(String, Box<dyn Factory<T>>)>,
     component_refs: &ComponentRefs,
 
 ) -> Option<ObjectIndex> {
