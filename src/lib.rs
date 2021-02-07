@@ -119,10 +119,12 @@ impl<'a, T: Default + Debug> Ecs<'a, T> {
     pub fn start(&mut self) {
         // update routine
         for system in &mut self.systems {
-            self.behaviours[system.index].on_start(&mut self.objects, system);
+            self.behaviours[system.index].on_startup(&mut self.objects, system);
         }
         // handle requests
         for system in &mut self.systems {
+            self.behaviours[system.index].on_early_update(&mut self.objects, system);
+
             if system.destroy_requests.len() > 0 || system.spawn_requests.len() > 0 {
                 system.handle_requests(&mut self.objects, &mut self.entities, &mut self.factories, &self.component_refs);
             }
@@ -132,6 +134,8 @@ impl<'a, T: Default + Debug> Ecs<'a, T> {
     pub fn update(&mut self) {
         // update routine
         for system in &mut self.systems {
+            self.behaviours[system.index].on_early_update(&mut self.objects, system);
+
             for pointer in &self.entities.active {
                 if system.components.0 == 
                     self.entities.pool[*pointer].0 & system.components.0 

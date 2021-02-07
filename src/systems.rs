@@ -71,7 +71,10 @@ pub trait Behaviour<T: Default> {
     fn required_components(&self) -> Vec<NameTag>;
 
     #[allow(unused_variables)]
-    fn on_start(&mut self, objects: &mut Objects<T>, system: &mut System) {}
+    fn on_startup(&mut self, objects: &mut Objects<T>, system: &mut System) {}
+
+    #[allow(unused_variables)]
+    fn on_early_update(&mut self, objects: &mut Objects<T>, system: &mut System) {}
 
     #[allow(unused_variables)]
     fn on_update(&mut self, target: &ObjectIndex, objects: &mut Objects<T>, system: &mut System);

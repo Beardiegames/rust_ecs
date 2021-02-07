@@ -3,6 +3,29 @@
 use std::time::SystemTime;
 use super::*;
 
+static mut TEST_EARLY: u128 = 0;
+
+#[test]
+fn early_update() {
+    unsafe { TEST_EARLY = 0; }
+
+    let mut ecs = EcsBuilder::new()
+            .define_component("call-1")
+        .build_systems()
+            .define_system(Box::new(Call1))
+        .setup_factories()
+            .define_factory("type-1", Box::new(Factory1))
+        .finalize();
+    
+    unsafe { 
+        assert_eq!(TEST_EARLY, 0);
+        ecs.start();
+        assert_eq!(TEST_EARLY, 1);
+        ecs.update();
+        assert_eq!(TEST_EARLY, 2);
+    }
+}
+
 #[test]
 fn update_speed() {
 
@@ -143,8 +166,13 @@ impl Behaviour<Cell> for Call1 {
     }
 
     #[allow(unused_variables)]
-    fn on_start(&mut self, objects: &mut Objects<Cell>, system: &mut System) {
+    fn on_startup(&mut self, objects: &mut Objects<Cell>, system: &mut System) {
         system.spawn("test", "type-2");
+    }
+
+    #[allow(unused_variables)]
+    fn on_early_update(&mut self, objects: &mut Objects<Cell>, system: &mut System) {
+        unsafe { TEST_EARLY += 1; }
     }
 
     #[allow(unused_variables)]
