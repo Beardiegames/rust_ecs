@@ -1,4 +1,4 @@
-# tiny_ecs
+# simple_ecs
 Simple and fast ECS library for Rust.
 
 The name tiny comes from it's maximum of a 1000 entities. It has been limited because all entity data is forced onto the stack, leaving some space for actual object data implementation.
