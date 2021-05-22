@@ -11,8 +11,6 @@ pub use systems::{ System, Behaviour };
 pub use types::{ NameTag, ComponentRefs, ComponentRef, BitFlags };
 pub use factory::*;
 
-const MAX_OBJECTS: usize = 1000;
-
 pub type ObjectIndex = usize;
 pub type ComponentIndex = usize;
 pub type SystemIndex = usize;
@@ -20,13 +18,14 @@ pub type SystemIndex = usize;
 
 // start by defining components
 pub struct EcsBuilder {
+    size: usize,
     component_refs: ComponentRefs,
 }
 
 impl EcsBuilder {
 
-    pub fn new() -> Self {
-        EcsBuilder{ component_refs: ComponentRefs(Vec::new()) }
+    pub fn new(size: usize) -> Self {
+        EcsBuilder{ size, component_refs: ComponentRefs(Vec::new()) }
     }
 
     pub fn define_component(mut self, name: &str) -> Self {
@@ -36,6 +35,7 @@ impl EcsBuilder {
 
     pub fn build_systems<T: Default>(self) -> SystemBuilder<T> {
         SystemBuilder {
+            size: self.size,
             component_refs: self.component_refs,
             systems: Vec::new(),
             behaviours: Vec::new(),
@@ -45,6 +45,7 @@ impl EcsBuilder {
 
 // secondly define systems
 pub struct SystemBuilder<T: Default> {
+    size: usize,
     component_refs: ComponentRefs, 
     systems: Vec<System>, 
     behaviours: Vec<Box<dyn Behaviour<T>>>
@@ -67,6 +68,7 @@ impl<'a, T: Default> SystemBuilder<T> {
 
     pub fn setup_factories(self) -> FactoryBuilder<'a, T> {
         FactoryBuilder { 
+            size: self.size,
             systems: self.systems,
             behaviours: self.behaviours,
             component_refs: self.component_refs,
@@ -77,6 +79,7 @@ impl<'a, T: Default> SystemBuilder<T> {
 
 // secondly define systems
 pub struct FactoryBuilder<'a, T: Default> {
+    size: usize,
     component_refs: ComponentRefs, 
     systems: Vec<System>, 
     behaviours: Vec<Box<dyn Behaviour<T>>>,
@@ -93,8 +96,9 @@ impl<'a, T: Default + Debug> FactoryBuilder<'a, T> {
 
     pub fn finalize(self) -> Ecs<'a, T> {
         Ecs { 
-            objects: Objects::new(),
-            entities: Entities::new(),
+            size: self.size,
+            objects: Objects::new(self.size),
+            entities: Entities::new(self.size),
             systems: self.systems,
             behaviours: self.behaviours,
             component_refs: self.component_refs,
@@ -106,6 +110,7 @@ impl<'a, T: Default + Debug> FactoryBuilder<'a, T> {
 
 // actual core ECS system
 pub struct Ecs<'a, T: Default> { 
+    size: usize,
     objects: Objects<T>, // object data pool, in other words entity component data
     entities: Entities, // object component implementation flags
     systems: Vec<System>, // behaviour wrappers for executing custom behaviour scripts
@@ -152,11 +157,10 @@ impl<'a, T: Default + Debug> Ecs<'a, T> {
         }
     }
 
-    // extremely slow!
     pub fn open_update<F>(&mut self, mut update_methode: F )
-    where F: FnMut(&mut T) {
+    where F: FnMut(&usize, &mut Vec<T>) {
         for pointer in &self.entities.active {
-            update_methode(&mut self.objects.pool[*pointer]);
+            update_methode(pointer, &mut self.objects.pool);
         }
     }
 

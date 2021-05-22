@@ -2,47 +2,47 @@ use std::fmt::Debug;
 use std::convert::TryInto;
 
 use super::{
-    MAX_OBJECTS,
+    //MAX_OBJECTS,
     ObjectIndex,
     NameTag,
     BitFlags,
 };
 
 pub struct Entities {
-    pub(crate) pool: [BitFlags; MAX_OBJECTS],
+    pub(crate) pool: Vec<BitFlags>, //[BitFlags; MAX_OBJECTS],
     pub(crate) active: Vec<ObjectIndex>,
     pub(crate) free: Vec<ObjectIndex>,
 }
 
 impl Entities {
-    pub(crate) fn new() -> Self {
-        let mut create_entities = Vec::<BitFlags>::with_capacity(MAX_OBJECTS);
-        create_entities.resize_with(MAX_OBJECTS, Default::default);
+    pub(crate) fn new(size: usize) -> Self {
+        let mut create_entities = Vec::<BitFlags>::with_capacity(size);
+        create_entities.resize_with(size, Default::default);
 
-        let mut free = Vec::with_capacity(MAX_OBJECTS);
-        for i in 0..MAX_OBJECTS { free.push(i); }
+        let mut free = Vec::with_capacity(size);
+        for i in 0..size { free.push(i); }
 
         Entities { 
-            pool: create_entities.try_into().unwrap(),
-            active: Vec::with_capacity(MAX_OBJECTS),
+            pool: create_entities, //create_entities.try_into().unwrap(),
+            active: Vec::with_capacity(size),
             free,
         }
     }
 }
 
 pub struct Objects<T: Default> {
-    pub(crate) pool: [T; MAX_OBJECTS],
+    pub(crate) pool: Vec<T>, //>[T; MAX_OBJECTS],
     pub(crate) active: Vec<(ObjectIndex, NameTag)>,
 }
 
 impl<T: Default + Debug> Objects<T> {
 
-    pub(crate) fn new() -> Self {
-        let mut create_objects = Vec::<T>::with_capacity(MAX_OBJECTS);
-        create_objects.resize_with(MAX_OBJECTS, Default::default);
+    pub(crate) fn new(size: usize) -> Self {
+        let mut create_objects = Vec::<T>::with_capacity(size);
+        create_objects.resize_with(size, Default::default);
 
         Objects { 
-            pool: create_objects.try_into().unwrap(),
+            pool: create_objects, //create_objects.try_into().unwrap(),
             active: Vec::new(),
         }
     }

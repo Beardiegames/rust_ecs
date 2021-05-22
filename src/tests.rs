@@ -7,20 +7,22 @@ static mut TEST_EARLY: u128 = 0;
 
 #[test]
 fn early_update() {
-    unsafe { TEST_EARLY = 0; }
-
-    let mut ecs = EcsBuilder::new()
-            .define_component("call-1")
-        .build_systems()
-            .define_system(Box::new(Call1))
-        .setup_factories()
-            .define_factory("type-1", Box::new(Factory1))
-        .finalize();
-    
     unsafe { 
+
+        let mut ecs = EcsBuilder::new(10)
+                .define_component("call-1")
+            .build_systems()
+                .define_system(Box::new(Call1))
+            .setup_factories()
+                .define_factory("type-1", Box::new(Factory1))
+            .finalize();
+        
+        TEST_EARLY = 0;
         assert_eq!(TEST_EARLY, 0);
+
         ecs.start();
         assert_eq!(TEST_EARLY, 1);
+
         ecs.update();
         assert_eq!(TEST_EARLY, 2);
     }
@@ -29,7 +31,7 @@ fn early_update() {
 #[test]
 fn update_speed() {
 
-    let mut ecs = EcsBuilder::new()
+    let mut ecs = EcsBuilder::new(10)
             .define_component("call-1")
             .define_component("call-2")
             .define_component("call-3")
@@ -51,15 +53,16 @@ fn update_speed() {
     ecs.spawn("entity-3", "type-3");
     ecs.start();
 
-    let num_updates: u128 = 100_000_000;
-    let num_calls: f64 = 3.0 * num_updates as f64;
+    let num_updates: u128 = 10_000_000;
+    let num_calls: f64 = 4.0 * num_updates as f64;
     let now = SystemTime::now();
 
     for _i in 0..num_updates { ecs.update(); }
 
     let elapsed_res = now.elapsed();
     match elapsed_res {
-        Ok(elapsed) => println!("updates {} M calls/s", (1_000.0 / elapsed.as_nanos() as f64) * num_calls),
+        Ok(elapsed) => println!("updates {} Mil calls/s", 
+            num_calls / (elapsed.as_nanos() as f64 / 1_000.0)),
         Err(e)      => println!("Error: {:?}", e),
     }
 
@@ -95,7 +98,7 @@ fn update_speed() {
 #[test]
 fn open_update_speed() {
 
-    let mut ecs:Ecs<Cell> = EcsBuilder::new()
+    let mut ecs:Ecs<Cell> = EcsBuilder::new(10)
         .build_systems()
         .setup_factories()
             .define_factory("type-1", Box::new(Factory1))
@@ -104,23 +107,22 @@ fn open_update_speed() {
     ecs.spawn("entity-1", "type-1");
     ecs.start();
     
-    let num_updates: u128 = 100_000_000;
+    let num_updates: u128 = 10_000_000;
     let now = SystemTime::now();
 
-    for _i in 0..num_updates { 
-        ecs.open_update(|obj| obj.call1 += 1 ); 
+    for _i in 0..num_updates {
+        ecs.open_update(|target, pool| pool[*target].call1 += 1);
     }
 
     let elapsed_res = now.elapsed();
     match elapsed_res {
-        Ok(elapsed) => println!("updates {} M calls/s", 1_000.0 / elapsed.as_nanos() as f64),
+        Ok(elapsed) => println!("updates {} Mil calls/s", 
+        num_updates as f64 / (elapsed.as_nanos() / 1_000) as f64),
         Err(e)      => println!("Error: {:?}", e),
     }
 
     if let Some(entity1) = ecs.objects.find("entity-1") {
-        println!(" - result 1: {}", 
-            ecs.objects.get_ref(&entity1).call1, 
-        );
+        println!(" - result 1: {}", ecs.objects.get_ref(&entity1).call1);
     }
     assert!(false);
 }
